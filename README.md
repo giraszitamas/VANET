@@ -1,6 +1,6 @@
 # VANET
 
-n a modern community, traveling and delivery of goods are
+In a modern community, traveling and delivery of goods are
 necessary. Technological progress has made in the automotive
 industry that makes the products cheaper, hence more and
 more cars are appearing on the roads. As technology improves,
@@ -22,3 +22,17 @@ such as making travel impossible or causing traffic jams, or
 just specifically attack an individual. They may also observe
 a person’s private travel patterns, which could be the basis for
 an organized robbery.
+
+An intelligent transport system is indispensable for
+today’s life. It can help to reduce traffic and even the number of
+accidents. However, it raises several security issues. Providing
+travelers’ privacy and anonymity is essential. We propose a
+message broadcast protocol for vehicle communication based
+on the blockchain technology. Eligible vehicles can anonymously
+report road conditions (e.g. traffic jams, accidents, etc.). We give
+an efficient solution applying Solana blockchain that provides fast
+block generation time and supports smart contracts. Blockchain
+maintains immutability of messages, enables anonymous message
+submission, moreover assures message unlinkability. Our scheme
+is identity-based, applying bilinear pairings batch verification of
+messages is accomplished.
