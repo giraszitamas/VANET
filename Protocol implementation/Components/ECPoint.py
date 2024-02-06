@@ -24,3 +24,9 @@ class ECPoint:
         :return: a pont string reprezentációja;
         """
         return str(self.x) + " " + str(self.y)
+    
+    def getCompact(self):
+        """
+        :return: a pont string reprezentációja;
+        """
+        return self.x

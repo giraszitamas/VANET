@@ -1,69 +1,115 @@
 import hashlib
 import random
+from Components.ECPoint import ECPoint
 from Components.TatePairing import TatePairing
+import math
+def point_to_byte(P):
+    x_byte = P.x.to_bytes(64)
+    y_byte = P.y.to_bytes(64)
+    return x_byte + y_byte
+
+def byte_to_point(B, ec):
+    x_byte = int.from_bytes(B[0:64])
+    y_byte = int.from_bytes(B[64:])
+
+    return ECPoint(ec, x_byte, y_byte)
 
 
-class BonehFranklin(object):
+class BonehFranklin_stream(object):
 
-    def H2(self, bp, n):
-        """
-        MIN_Length = 256
-        SHA-256 hash, melynek visszatérési értékének hosszát a második paraméter adja meg
-        :param bp: hashelni kívánt pont;
-        :param n: hossz;
-        :return: adott hosszúságú hash;
-        """
-        bp = str(bp)
+    def H2(self, bp):
+        bp = bp.to_bytes(64)
         BPhash = hashlib.sha256()
-        BPhash.update(bp.encode())
-        BPhash = int(BPhash.hexdigest(), base=16)
-        BPhash = str(BPhash)
-        while len(BPhash) < n:
-            BPhash = "a" + BPhash
+        BPhash.update(bp)
+        BPhash = int(BPhash.hexdigest(), base=16).to_bytes(32)
+
         return BPhash
 
     def encryp(self, msg, Qr, gammaP, P, EC):
-        """
-        Titkosítás
-        :param msg: titkosítandó üzenet;
-        :param Qr: küldő nyilvános kulcs;
-        :param gammaP: rendszer nyilvános paramétere;
-        :param P: rendszer nyilvános paramétere;
-        :param EC: elliptikus görbe osztály példánya;
-        :return: titkosíott üzenet egy értékpár formájában (rP, v);
-        """
         r = random.getrandbits(128)
         rP = EC.mulJ(P, r)
         rgammaP = EC.mulJ(gammaP, r)
         gIDr = TatePairing.computeF(TatePairing, Qr, rgammaP, EC)
-        gIDr = self.H2(self, gIDr.toString(), len(msg))
-        v = sxor(msg, gIDr)
+        gIDr = self.H2(self, gIDr.real)
+        v = self.xor(self,msg, gIDr)
         return rP, v
 
     def decrypt(self, rP, v, gammaQr, EC):
-        """
-        Visszafejtés
-        :param rP: titkosított üzenet megfelelő része (rP);
-        :param v: titkosított üzenet megfelelő része (v);
-        :param gammaQr: címzett titkos kulcsa;
-        :param EC: elliptikus görbe osztály paramétere;
-        :return: visszafejtett üzenet;
-        """
-        h2 = self.H2(self, TatePairing.computeF(TatePairing, gammaQr, rP, EC).toString(), len(v))
-        return sxor(v, h2)
+        h2 = self.H2(self, TatePairing.computeF(TatePairing, gammaQr, rP, EC).real)
+        return self.xor(self,v, h2)
 
 
-def sxor(s1, s2):
-    """
-    Stringek közötti kizáró vagy művelet. A stringekből először karaktertömböket hoz létre, majd a karakterek ASCII
-    értékeit XOR-olja és visszaalakítja azokat karakterré ezután a kapott értékeket összefűzi stringgé.
-    :param s1: 1# string;
-    :param s2: 2# string;
-    :return: 1# string XOR 2# string;
-    """
-    # convert strings to a list of character pair tuples
-    # go through each tuple, converting them to ASCII code (ord)
-    # perform exclusive or on the ASCII code
-    # then convert the result back to ASCII (chr)
-    # merge the resulting array of characters as a string
-    return ''.join(chr(ord(a) ^ ord(b)) for a, b in zip(s1, s2))
+    def xor(self,s1, s2):
+        ret = (s1[0] ^ s2[0]).to_bytes()
+        for i in range(1,len(s1)):
+            ret+=(s1[i] ^ s2[i%len(s2)]).to_bytes()
+        return ret
+
+
+class BonehFranklin_block(object):
+
+    def H2(self, bp):
+        bp = bp.to_bytes(64)
+        BPhash = hashlib.sha256()
+        BPhash.update(bp)
+        BPhash = int(BPhash.hexdigest(), base=16).to_bytes(32)
+
+        return BPhash
+
+    def encryp(self, msg, Qr, gammaP, P, EC):
+
+
+        r = random.getrandbits(128)
+        rP = EC.mulJ(P, r)
+        rgammaP = EC.mulJ(gammaP, r)
+        gIDr = TatePairing.computeF(TatePairing, Qr, rgammaP, EC)
+        gIDr = self.H2(self, gIDr.real)
+
+        to_enc_msg = msg[:32]
+
+
+        ret = point_to_byte(rP) + self.xor(self, to_enc_msg, gIDr)
+        for i in range(1, int(len(msg)/32)):
+            r = random.getrandbits(128)
+            rP = EC.mulJ(P, r)
+            rgammaP = EC.mulJ(gammaP, r)
+            gIDr = TatePairing.computeF(TatePairing, Qr, rgammaP, EC)
+            gIDr = self.H2(self, gIDr.real)
+
+            to_enc_msg = msg[i*32:(i+1)*32]
+
+
+            v = self.xor(self, to_enc_msg, gIDr)
+
+            ret += point_to_byte(rP) + v
+
+        return ret
+
+    def decrypt(self, M1_block, gammaQr, EC):
+
+        c = M1_block[:160]
+        rP = byte_to_point(c[:128],EC)
+        v = c[128:]
+
+
+        h2 = self.H2(self, TatePairing.computeF(TatePairing, gammaQr, rP, EC).real)
+
+
+        ret = self.xor(self,v, h2)
+
+        for i in range(1,int(len(M1_block)/160)):
+            c = M1_block[i*160:(i+1)*160]
+            rP = byte_to_point(c[:128],EC)
+            v = c[128:]
+
+            h2 = self.H2(self, TatePairing.computeF(TatePairing, gammaQr, rP, EC).real)
+            ret += self.xor(self,v, h2)
+        return ret
+
+
+    def xor(self,s1, s2):
+        ret = (s1[0] ^ s2[0]).to_bytes()
+        for i in range(1,len(s1)):
+            ret+=(s1[i] ^ s2[i]).to_bytes()
+        return ret
+
