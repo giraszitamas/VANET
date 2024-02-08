@@ -24,6 +24,22 @@ from Crypto.Cipher import AES
 from ecdsa import SigningKey, VerifyingKey, NIST384p
 
 
+from solana.transaction import Transaction
+from solders.pubkey import Pubkey
+from solders.keypair import Keypair
+from solders.instruction import Instruction, AccountMeta
+from solders.rpc.responses import SendTransactionResp
+from solana.rpc.api import Client
+from solana.transaction import Transaction
+from solders.system_program import TransferParams, transfer
+from construct import *
+
+client: Client = Client("https://api.devnet.solana.com")
+
+sender = Keypair.from_bytes([..............................]
+)
+
+
 gamma = None
 # Global parameters
 P = None
@@ -204,12 +220,34 @@ def obu_compute_cs_2(Qv, gammaQv, xi_s_gammaQv, s, ec, Qr, xiQr, v = 1,car_id = 
         print("b(gQv ,xiQr) =",str(chk_2.real))
         print("validity     =",validity)
     return xi_gammaQv, validity
+def send_to_chain(msg, sender_acc, program_id = "Fwn57Eb8rWF2jpWGtVafLaGifXoom5af1CJVDmJvvd6o"):
+    """
+    d = Struct(
+        "ex1" / Int8ub,
+        "ex2" / Int8ub,
+        "ex3" / Int8ub
+    )
+    v = d.build(dict(ex1=3, ex2=2, ex3=2))
+    """
+    pubk = Pubkey.from_string(program_id)
 
+    txn = Transaction().add(
+        Instruction(
+            accounts=[AccountMeta(sender_acc.pubkey(), False, True)], program_id=pubk, data=msg
+        )
+    )
+    res = client.send_transaction(txn, sender_acc)
+
+
+    return res
 def incident_report(Qv,xigQv, v = 1, M = None,car_id = None):
     start = timeit.default_timer()
     a = random.getrandbits(128)
     Aid = ec.mulJ(Qv, a)
     A1 = ec.mulJ(xigQv, a)
+
+    print(send_to_chain(point_to_byte(Aid)+point_to_byte(A1)+struct.pack("ffi", M[0], M[1], M[2]),sender))
+
     stop = timeit.default_timer()
     logs_time.write(str(car_id)+"#incident_report"+"#"+str(stop-start)+"\n")
     if v:
